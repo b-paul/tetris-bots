@@ -471,7 +471,24 @@ impl Piece {
                 },
             },
             Piece::G => panic!("Garbage can't be rotated! What!?!?"),
-            Piece::O => [(0, 0); 5],
+            Piece::O => match orientation {
+                Orientation::North => match rotation {
+                    Rotation::Clockwise => [(0, 1); 5],
+                    Rotation::AntiClockwise => [(1, 0); 5],
+                },
+                Orientation::East => match rotation {
+                    Rotation::Clockwise => [(1, 0); 5],
+                    Rotation::AntiClockwise => [(0, -1); 5],
+                },
+                Orientation::South => match rotation {
+                    Rotation::Clockwise => [(0, -1); 5],
+                    Rotation::AntiClockwise => [(-1, 0); 5],
+                },
+                Orientation::West => match rotation {
+                    Rotation::Clockwise => [(-1, 0); 5],
+                    Rotation::AntiClockwise => [(0, 1); 5],
+                },
+            },
             _ => match orientation {
                 Orientation::North => match rotation {
                     Rotation::Clockwise => [(0, 0), (-1, 0), (-1, 1), (0, -2), (-1, -2)],
