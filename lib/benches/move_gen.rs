@@ -1,5 +1,5 @@
 use criterion::{criterion_group, criterion_main, Criterion};
-use tetris_bot_lib::*;
+use lib::*;
 
 pub fn criterion_benchmark(c: &mut Criterion) {
     let board = Board {
@@ -18,7 +18,7 @@ pub fn criterion_benchmark(c: &mut Criterion) {
         ],
     };
     c.bench_function("move gen for empty board I piece", |b| {
-        b.iter(|| board.gen_moves(Piece::I))
+        b.iter(|| board.gen_moves())
     });
 }
 

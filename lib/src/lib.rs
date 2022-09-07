@@ -31,7 +31,7 @@ impl SearchStatus {
     pub fn terminate(&self) -> bool {
         !self.terminate.load(Ordering::Acquire)
     }
-    pub fn current_moves(&self, moves: &Vec<Move>) {
+    pub fn current_moves(&self, moves: &[Move]) {
         if self.want_moves.load(Ordering::Acquire) {
             self.suggestion_sender.send(moves.to_vec()).unwrap();
             self.want_moves.store(false, Ordering::Release);

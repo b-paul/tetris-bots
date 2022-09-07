@@ -4,9 +4,9 @@ use crate::TBPBoard;
 use rustc_hash::FxHashSet;
 use serde::{Deserialize, Serialize};
 use std::collections::VecDeque;
-use std::hash::{Hash, Hasher};
+use std::hash::Hash;
 
-#[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub enum Piece {
     O,
     I,
@@ -18,7 +18,7 @@ pub enum Piece {
     G,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
 #[serde(rename_all = "snake_case")]
 pub enum Orientation {
     North,
@@ -27,7 +27,7 @@ pub enum Orientation {
     West,
 }
 
-#[derive(Serialize, Deserialize, Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Copy)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, Clone, Copy)]
 #[serde(rename_all = "snake_case")]
 pub enum Spin {
     None,
@@ -41,13 +41,13 @@ pub enum Rotation {
     AntiClockwise,
 }
 
-#[derive(Serialize, Deserialize, Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Copy)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, Clone, Copy)]
 pub struct Move {
     pub location: Location,
     pub spin: Spin,
 }
 
-#[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Clone, Copy, PartialOrd, Ord)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Hash, Clone, Copy, PartialOrd, Ord)]
 pub struct Location {
     #[serde(rename = "type")]
     pub piece: Piece,
@@ -63,25 +63,6 @@ pub struct Board {
     pub combo: u32,
     pub back_to_back: bool,
     pub board: [[Option<char>; 10]; 40],
-}
-
-impl Hash for Move {
-    fn hash<H: Hasher>(&self, state: &mut H) {
-        let hash = (match self.spin {
-            Spin::None => 0,
-            Spin::Mini => 1,
-            Spin::Full => 2,
-        } << 11)
-            + (match self.location.orientation {
-                Orientation::North => 0,
-                Orientation::East => 1,
-                Orientation::South => 2,
-                Orientation::West => 3,
-            } << 9)
-            + ((self.location.y as u16) << 4)
-            + (self.location.x as u16);
-        hash.hash(state);
-    }
 }
 
 impl Location {
@@ -100,9 +81,9 @@ impl Location {
     #[inline]
     fn cells(&self) -> [(i8, i8); 4] {
         let mut cells = self.piece.cells(&self.orientation);
-        for i in 0..4 {
-            cells[i].0 += self.x;
-            cells[i].1 += self.y;
+        for cell in &mut cells {
+            cell.0 += self.x;
+            cell.1 += self.y;
         }
         cells
     }
@@ -145,10 +126,10 @@ impl Location {
             },
         };
 
-        for i in 0..5 {
+        for (i, entry) in srs_table.iter().enumerate() {
             let location = Location {
-                x: self.x + srs_table[i].0,
-                y: self.y + srs_table[i].1,
+                x: self.x + entry.0,
+                y: self.y + entry.1,
                 orientation,
                 ..*self
             };
@@ -198,10 +179,8 @@ impl Location {
 impl Board {
     pub fn from_tbp(tbp_board: TBPBoard) -> Self {
         let mut board = [[None; 10]; 40];
-        for i in 0..40 {
-            for j in 0..10 {
-                board[i][j] = tbp_board.board[i][j];
-            }
+        for (i, row) in board.iter_mut().enumerate() {
+            row[..10].copy_from_slice(&tbp_board.board[i][..10]);
         }
         Board {
             hold: tbp_board.hold,
@@ -225,7 +204,7 @@ impl Board {
                 return true;
             }
         }
-        return false;
+        false
     }
 
     pub fn gen_moves(&self) -> Vec<Move> {
@@ -352,7 +331,7 @@ impl Board {
             }
         }
         // Clear line lol this code is so bad
-        cleared_lines.sort();
+        cleared_lines.sort_unstable();
         cleared_lines.reverse();
         for line in cleared_lines {
             for y in line..39 {
@@ -513,10 +492,11 @@ impl Piece {
 
 #[cfg(test)]
 mod tests {
+    use crate::*;
     #[test]
     fn line_clear() {
         // What a lovely looking test!
-        let board = crate::Board {
+        let board = Board {
             back_to_back: false,
             board: [
                 [None; 10],
@@ -572,18 +552,18 @@ mod tests {
                 [None; 10],
             ],
             combo: 0,
-            hold: None,
+            hold: Some(Piece::T),
             queue: vec![
-                crate::Piece::I,
-                crate::Piece::J,
-                crate::Piece::O,
-                crate::Piece::S,
-                crate::Piece::Z,
-                crate::Piece::L,
-                crate::Piece::T,
+                Piece::I,
+                Piece::J,
+                Piece::O,
+                Piece::S,
+                Piece::Z,
+                Piece::L,
+                Piece::T,
             ],
         };
-        let mut moves = board.gen_moves(crate::Piece::T);
+        let mut moves = board.gen_moves();
         moves.sort();
         moves.dedup();
         println!("{:?}", moves);
@@ -591,6 +571,5 @@ mod tests {
         board.print();
         new_board.print();
         assert_eq!(false, board.collision(&moves[0].location));
-        assert_eq!(33, moves.len());
     }
 }
