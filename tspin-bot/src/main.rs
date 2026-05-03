@@ -21,7 +21,7 @@ impl Bot for TspinBot {
         TspinBot { board }
     }
 
-    fn search(&self, search_status: &SearchStatus<BbMove>) {
+    fn search(&mut self, search_status: &SearchStatus<BbMove>) {
         let q_function = q_function::Baby::new();
         /*
         let mut q_function = nn::Network::new_random();

@@ -444,20 +444,20 @@ impl Piece {
         match self {
             Piece::I => match orientation {
                 Orientation::North => match rotation {
-                    Rotation::Clockwise => [(0, 0), (-2, 0), (1, 0), (-2, -1), (1, 2)],
-                    Rotation::AntiClockwise => [(0, 0), (-1, 0), (2, 0), (-1, 2), (2, -1)],
+                    Rotation::Clockwise => [(1, 0), (-1, 0), (2, 0), (-1, -1), (2, 2)],
+                    Rotation::AntiClockwise => [(0, -1), (-1, -1), (2, -1), (-1, 1), (2, -2)],
                 },
                 Orientation::East => match rotation {
-                    Rotation::Clockwise => [(0, 0), (-1, 0), (2, 0), (-1, 2), (2, -1)],
-                    Rotation::AntiClockwise => [(0, 0), (2, 0), (-1, 0), (2, 1), (-1, -2)],
+                    Rotation::Clockwise => [(0, -1), (-1, -1), (2, -1), (-1, 1), (2, -2)],
+                    Rotation::AntiClockwise => [(-1, 0), (1, 0), (-2, 0), (1, 1), (-2, -2)],
                 },
                 Orientation::South => match rotation {
-                    Rotation::Clockwise => [(0, 0), (2, 0), (-1, 0), (2, 1), (-1, -2)],
-                    Rotation::AntiClockwise => [(0, 0), (1, 0), (-2, 0), (1, -2), (-2, 1)],
+                    Rotation::Clockwise => [(-1, 0), (1, 0), (-2, 0), (1, 1), (-2, -2)],
+                    Rotation::AntiClockwise => [(0, 1), (1, 1), (-2, 1), (1, -1), (-2, 2)],
                 },
                 Orientation::West => match rotation {
-                    Rotation::Clockwise => [(0, 0), (1, 0), (-2, 0), (1, -2), (-2, 1)],
-                    Rotation::AntiClockwise => [(0, 0), (-2, 0), (1, 0), (-2, -1), (1, 2)],
+                    Rotation::Clockwise => [(0, 1), (1, 1), (-2, 1), (1, -1), (-2, 2)],
+                    Rotation::AntiClockwise => [(1, 0), (-1, 0), (2, 0), (-1, -1), (2, 2)],
                 },
             },
             Piece::G => panic!("Garbage can't be rotated! What!?!?"),
@@ -581,6 +581,6 @@ mod tests {
         let new_board = board.make_move(moves[12]);
         board.print();
         new_board.print();
-        assert_eq!(false, board.collision(&moves[0].location));
+        assert!(!board.collision(&moves[0].location));
     }
 }

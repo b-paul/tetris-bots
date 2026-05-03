@@ -14,7 +14,7 @@ impl Bot for BadBot {
         BadBot { board }
     }
 
-    fn search(&self, search_status: &SearchStatus<BbMove>) {
+    fn search(&mut self, search_status: &SearchStatus<BbMove>) {
         let new_board = &mut self.board.clone();
 
         let mut mv = self.get_best_move(new_board);

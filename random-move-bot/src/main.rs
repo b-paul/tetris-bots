@@ -14,7 +14,7 @@ impl Bot for RandomBot {
     fn new(board: NaiveBoard) -> Self {
         RandomBot { board }
     }
-    fn search(&self, search_status: &SearchStatus<NaiveMove>) {
+    fn search(&mut self, search_status: &SearchStatus<NaiveMove>) {
         let mutable_board = &mut self.board.clone();
 
         let mut mv = self.get_move(mutable_board);

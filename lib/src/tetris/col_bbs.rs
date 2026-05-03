@@ -13,11 +13,14 @@ pub struct BbBoard {
     pub queue: Vec<Piece>,
     pub combo: u32,
     pub back_to_back: bool,
+    pub back_to_back_count: usize,
     pub board: [u64; 10],
     pub tspins: usize,
     pub wasted_ts: usize,
+    /// for silly bots that want to never break b2b
+    pub broke_b2b: bool,
+    pub minied: bool,
     // counter for single, double, triple, tetris, tss, tsd and tst clears
-    // maybe also back_to_back size
 }
 
 impl Board for BbBoard {
@@ -36,9 +39,12 @@ impl Board for BbBoard {
             queue: tbp_board.queue,
             combo: tbp_board.combo,
             back_to_back: tbp_board.back_to_back,
+            back_to_back_count: if tbp_board.back_to_back { 1 } else { 0 },
             board,
             tspins: 0,
             wasted_ts: 0,
+            broke_b2b: false,
+            minied: false,
         }
     }
 }
@@ -60,9 +66,13 @@ impl From<TBPMove> for BbMove {
 
 impl From<BbMove> for TBPMove {
     fn from(mv: BbMove) -> Self {
+        let spin = match mv.location.piece {
+            Piece::T => mv.spin,
+            _ => Spin::None,
+        };
         TBPMove {
             location: mv.location.into(),
-            spin: mv.spin,
+            spin,
         }
     }
 }
@@ -145,8 +155,22 @@ impl BbLocation {
         })
     }
 
+    /// determines wheter shifting the location by the given offset is blocked
+    fn shift_blocked(&self, board: &BbBoard, (dx, dy): (i8, i8)) -> bool {
+        let location = BbLocation {
+            x: self.x + dx,
+            y: self.y + dy,
+            ..*self
+        };
+        board.collision(&location)
+    }
+
     #[inline]
     fn rotate(&self, board: &BbBoard, rotation: Rotation) -> Option<BbMove> {
+        if self.piece == Piece::O {
+            return None;
+        }
+
         let srs_table = self.piece.srs_table(&self.orientation, rotation);
 
         let orientation = match self.orientation {
@@ -198,6 +222,13 @@ impl BbLocation {
                             spin = Spin::Mini;
                         }
                     }
+                } else {
+                    // piece can't move in any direction -> mini
+                    const DIRS: [(i8, i8); 4] = [(-1, 0), (1, 0), (0, -1), (0, 1)];
+                    //const DIRS: [(i8, i8); 1] = [(0, 1)];
+                    if DIRS.iter().all(|&off| location.shift_blocked(board, off)) {
+                        spin = Spin::Mini;
+                    }
                 }
                 return Some(BbMove { location, spin });
             }
@@ -219,27 +250,6 @@ impl BbLocation {
 }
 
 impl BbBoard {
-    pub fn from_tbp(tbp_board: TBPBoard) -> Self {
-        let mut board = [0; 10];
-        for (r, row) in tbp_board.board.iter().enumerate() {
-            for (c, cell) in row.iter().enumerate() {
-                if cell.is_some() {
-                    board[c] |= 1 << r;
-                }
-            }
-        }
-
-        BbBoard {
-            hold: tbp_board.hold,
-            queue: tbp_board.queue,
-            combo: tbp_board.combo,
-            back_to_back: tbp_board.back_to_back,
-            board,
-            tspins: 0,
-            wasted_ts: 0,
-        }
-    }
-
     #[inline]
     pub fn occupied(&self, x: i8, y: i8) -> bool {
         !(0..10).contains(&x) || !(0..40).contains(&y) || (self.board[x as usize] & (1 << y)) != 0
@@ -247,13 +257,7 @@ impl BbBoard {
 
     #[inline]
     pub fn collision(&self, location: &BbLocation) -> bool {
-        let cells = location.cells();
-        for (x, y) in cells {
-            if self.occupied(x, y) {
-                return true;
-            }
-        }
-        false
+        location.cells().iter().any(|&(x, y)| self.occupied(x, y))
     }
 
     pub fn gen_moves(&self) -> Vec<BbMove> {
@@ -416,11 +420,18 @@ impl BbBoard {
             // add line clear counter
         }
 
-        if lines_cleared == 4 || (mv.spin != Spin::None && lines_cleared != 0) {
-            new_board.back_to_back = true;
-        } else if lines_cleared != 0 {
-            new_board.back_to_back = false;
+        if lines_cleared != 0 {
+            if lines_cleared == 4 || mv.spin != Spin::None {
+                new_board.back_to_back = true;
+                new_board.back_to_back_count += 1;
+            } else {
+                new_board.broke_b2b = true;
+                new_board.back_to_back = false;
+                new_board.back_to_back_count = 0;
+            }
         }
+
+        new_board.minied = mv.spin == Spin::Mini;
 
         new_board
     }
@@ -464,5 +475,45 @@ impl BbBoard {
             }
             println!("{}", str);
         }
+    }
+
+    pub fn perft(self) -> usize {
+        let p = self.queue[0];
+
+        if self.queue.len() == 1 {
+            println!("{:?}", self.gen_moves_for_piece(p));
+            self.gen_moves_for_piece(p).len()
+        } else {
+            self.gen_moves_for_piece(p)
+                .into_iter()
+                .map(|m| self.make_move(m).perft())
+                .sum()
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn perft() {
+        let queue = vec![
+            Piece::I,
+        ];
+        let board = BbBoard {
+            hold: None,
+            queue,
+            combo: 0,
+            back_to_back: false,
+            back_to_back_count: 0,
+            //board: [0; 10],
+            board: [1,1,3,3,1,0,0,0,14,15],
+            tspins: 0,
+            wasted_ts: 0,
+            broke_b2b: false,
+            minied: false,
+        };
+        assert_eq!(board.perft(), 17)
     }
 }

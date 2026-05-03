@@ -18,7 +18,7 @@ pub trait Bot {
     type MoveType: Move;
 
     fn new(board: Self::BoardType) -> Self;
-    fn search(&self, search_states: &SearchStatus<Self::MoveType>);
+    fn search(&mut self, search_status: &SearchStatus<Self::MoveType>);
 }
 
 pub trait Board: Send + Sync {
@@ -138,7 +138,7 @@ pub fn run_bot<B: Bot + 'static>(info: BotInfo) {
                                 suggestion_sender: move_sender,
                                 play_move,
                             };
-                            let bot = B::new(board);
+                            let mut bot = B::new(board);
                             bot.search(&search_status);
                         }
                     });
