@@ -1,21 +1,26 @@
+use lib::tbp::BotInfo;
+use lib::tetris::*;
 use lib::*;
 use rand::Rng;
 
 struct RandomBot {
-    board: Board,
+    board: NaiveBoard,
 }
 
 impl Bot for RandomBot {
-    fn new(board: Board) -> Self {
+    type BoardType = NaiveBoard;
+    type MoveType = NaiveMove;
+
+    fn new(board: NaiveBoard) -> Self {
         RandomBot { board }
     }
-    fn search(&self, search_status: &SearchStatus) {
+    fn search(&self, search_status: &SearchStatus<NaiveMove>) {
         let mutable_board = &mut self.board.clone();
 
         let mut mv = self.get_move(mutable_board);
 
         loop {
-            search_status.current_moves(&vec![mv]);
+            search_status.current_moves(&[mv]);
             if search_status.terminate() {
                 break;
             }
@@ -31,7 +36,7 @@ impl Bot for RandomBot {
 }
 
 impl RandomBot {
-    fn get_move(&self, board: &Board) -> Move {
+    fn get_move(&self, board: &NaiveBoard) -> NaiveMove {
         let moves = board.gen_moves();
         moves[rand::thread_rng().gen_range(0..moves.len())]
     }

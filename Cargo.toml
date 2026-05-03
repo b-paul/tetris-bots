@@ -3,4 +3,5 @@ members = [
 "lib",
 "random-move-bot",
 "test-tetris-bot",
+"tspin-bot",
 ]

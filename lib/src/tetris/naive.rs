@@ -1,54 +1,39 @@
 extern crate serde;
 
-use crate::TBPBoard;
+use crate::{Board, Move, Orientation, Piece, Rotation, Spin, TBPBoard, TBPMove, TBPLocation};
 use rustc_hash::FxHashSet;
 use serde::{Deserialize, Serialize};
 use std::collections::VecDeque;
 use std::hash::Hash;
 
-#[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
-pub enum Piece {
-    O,
-    I,
-    T,
-    L,
-    J,
-    S,
-    Z,
-    G,
-}
-
-#[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
-#[serde(rename_all = "snake_case")]
-pub enum Orientation {
-    North,
-    East,
-    South,
-    West,
-}
-
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, Clone, Copy)]
-#[serde(rename_all = "snake_case")]
-pub enum Spin {
-    None,
-    Mini,
-    Full,
-}
-
-#[derive(Clone, Copy)]
-pub enum Rotation {
-    Clockwise,
-    AntiClockwise,
-}
-
-#[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, Clone, Copy)]
-pub struct Move {
-    pub location: Location,
+pub struct NaiveMove {
+    pub location: NaiveLocation,
     pub spin: Spin,
 }
 
+impl From<NaiveMove> for TBPMove {
+    fn from(mv: NaiveMove) -> Self {
+        TBPMove {
+            location: mv.location.into(),
+            spin: mv.spin,
+        }
+    }
+}
+
+impl From<TBPMove> for NaiveMove {
+    fn from(tbp: TBPMove) -> Self {
+        NaiveMove {
+            location: tbp.location.into(),
+            spin: tbp.spin,
+        }
+    }
+}
+
+impl Move for NaiveMove {}
+
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Hash, Clone, Copy, PartialOrd, Ord)]
-pub struct Location {
+pub struct NaiveLocation {
     #[serde(rename = "type")]
     pub piece: Piece,
     pub orientation: Orientation,
@@ -56,8 +41,31 @@ pub struct Location {
     pub y: i8,
 }
 
+impl From<NaiveLocation> for TBPLocation {
+    fn from(loc: NaiveLocation) -> Self {
+        TBPLocation {
+            piece: loc.piece,
+            orientation: loc.orientation,
+            x: loc.x,
+            y: loc.y,
+        }
+    }
+}
+
+
+impl From<TBPLocation> for NaiveLocation {
+    fn from(tbp: TBPLocation) -> Self {
+        NaiveLocation {
+            piece: tbp.piece,
+            orientation: tbp.orientation,
+            x: tbp.x,
+            y: tbp.y,
+        }
+    }
+}
+
 #[derive(Clone)]
-pub struct Board {
+pub struct NaiveBoard {
     pub hold: Option<Piece>,
     pub queue: Vec<Piece>,
     pub combo: u32,
@@ -65,13 +73,29 @@ pub struct Board {
     pub board: [[Option<char>; 10]; 40],
 }
 
-impl Location {
+impl Board for NaiveBoard {
+    fn from_tbp(tbp_board: TBPBoard) -> Self {
+        let mut board = [[None; 10]; 40];
+        for (i, row) in board.iter_mut().enumerate() {
+            row[..10].copy_from_slice(&tbp_board.board[i][..10]);
+        }
+        NaiveBoard {
+            hold: tbp_board.hold,
+            queue: tbp_board.queue,
+            combo: tbp_board.combo,
+            back_to_back: tbp_board.back_to_back,
+            board,
+        }
+    }
+}
+
+impl NaiveLocation {
     #[inline]
-    fn drop_y(&self, board: &Board) -> i8 {
+    fn drop_y(&self, board: &NaiveBoard) -> i8 {
         // This function is slow and can probably be improved with some bitboard magic
         let mut y = self.y;
 
-        while !board.collision(&Location { y, ..*self }) {
+        while !board.collision(&NaiveLocation { y, ..*self }) {
             y -= 1;
         }
 
@@ -89,22 +113,22 @@ impl Location {
     }
 
     #[inline]
-    fn shift(&self, board: &Board, offset: i8) -> Option<Move> {
-        let location = Location {
+    fn shift(&self, board: &NaiveBoard, offset: i8) -> Option<NaiveMove> {
+        let location = NaiveLocation {
             x: self.x + offset,
             ..*self
         };
         if board.collision(&location) {
             return None;
         }
-        Some(Move {
+        Some(NaiveMove {
             location,
             spin: Spin::None,
         })
     }
 
     #[inline]
-    fn rotate(&self, board: &Board, rotation: Rotation) -> Option<Move> {
+    fn rotate(&self, board: &NaiveBoard, rotation: Rotation) -> Option<NaiveMove> {
         let srs_table = self.piece.srs_table(&self.orientation, rotation);
 
         let orientation = match self.orientation {
@@ -127,7 +151,7 @@ impl Location {
         };
 
         for (i, entry) in srs_table.iter().enumerate() {
-            let location = Location {
+            let location = NaiveLocation {
                 x: self.x + entry.0,
                 y: self.y + entry.1,
                 orientation,
@@ -157,47 +181,33 @@ impl Location {
                         }
                     }
                 }
-                return Some(Move { location, spin });
+                return Some(NaiveMove { location, spin });
             }
         }
         None
     }
 
     #[inline]
-    fn soft_drop(&self, board: &Board) -> Option<Move> {
+    fn soft_drop(&self, board: &NaiveBoard) -> Option<NaiveMove> {
         let y = self.drop_y(board);
         if y == self.y {
             return None;
         }
-        Some(Move {
-            location: Location { y, ..*self },
+        Some(NaiveMove {
+            location: NaiveLocation { y, ..*self },
             spin: Spin::None,
         })
     }
 }
 
-impl Board {
-    pub fn from_tbp(tbp_board: TBPBoard) -> Self {
-        let mut board = [[None; 10]; 40];
-        for (i, row) in board.iter_mut().enumerate() {
-            row[..10].copy_from_slice(&tbp_board.board[i][..10]);
-        }
-        Board {
-            hold: tbp_board.hold,
-            queue: tbp_board.queue,
-            combo: tbp_board.combo,
-            back_to_back: tbp_board.back_to_back,
-            board,
-        }
-    }
-
+impl NaiveBoard {
     #[inline]
     pub fn occupied(&self, x: i8, y: i8) -> bool {
-        !(0..10).contains(&x) || !(0..40).contains(&y) || self.board[y as usize][x as usize] != None
+        !(0..10).contains(&x) || !(0..40).contains(&y) || self.board[y as usize][x as usize].is_some()
     }
 
     #[inline]
-    pub fn collision(&self, location: &Location) -> bool {
+    pub fn collision(&self, location: &NaiveLocation) -> bool {
         let cells = location.cells();
         for (x, y) in cells {
             if self.occupied(x, y) {
@@ -207,7 +217,7 @@ impl Board {
         false
     }
 
-    pub fn gen_moves(&self) -> Vec<Move> {
+    pub fn gen_moves(&self) -> Vec<NaiveMove> {
         let mut move_list = Vec::new();
         move_list.append(&mut self.gen_moves_for_piece(self.queue[0]));
         if let Some(hold) = self.hold {
@@ -219,7 +229,7 @@ impl Board {
         move_list
     }
 
-    pub fn gen_moves_for_piece(&self, piece: Piece) -> Vec<Move> {
+    pub fn gen_moves_for_piece(&self, piece: Piece) -> Vec<NaiveMove> {
         // Performance:
         // Hash set functions account for like 40% of this function REDUCED to like %30 with fxhash
         // drop_y 20%
@@ -228,19 +238,19 @@ impl Board {
         // soft drop 9%! because it has a drop_y
         // drop_y is slow because of collision
 
-        let mut move_list: Vec<Move> = Vec::with_capacity(64);
+        let mut move_list: Vec<NaiveMove> = Vec::with_capacity(64);
 
         let mut queue = VecDeque::new();
         let mut hash = FxHashSet::default();
 
-        let initial_location = Location {
+        let initial_location = NaiveLocation {
             piece,
             orientation: Orientation::North,
             x: 5,
             y: 19,
         };
 
-        let initial_move = Move {
+        let initial_move = NaiveMove {
             location: initial_location,
             spin: Spin::None,
         };
@@ -256,8 +266,8 @@ impl Board {
             if y == mv.location.y {
                 spin = mv.spin;
             }
-            move_list.push(Move {
-                location: Location { y, ..mv.location },
+            move_list.push(NaiveMove {
+                location: NaiveLocation { y, ..mv.location },
                 spin,
             });
 
@@ -300,7 +310,7 @@ impl Board {
         move_list
     }
 
-    pub fn make_move(&self, mv: Move) -> Board {
+    pub fn make_move(&self, mv: NaiveMove) -> NaiveBoard {
         // I hope making a new board isnt that bad
         // There is like almost a 100% chance this isnt optimal
         // It is very bad.
@@ -309,10 +319,11 @@ impl Board {
         // Using row major bitboards might be faster because you would only have to do 1 or 2 pext
         // instructions and then a bunch of shifts but the shifts might be optimized with simd
         let queue = self.queue.clone();
-        let mut new_board = Board { queue, ..*self };
+        let mut new_board = NaiveBoard { queue, ..*self };
         let piece = mv.location.cells();
         let mut cleared_lines = Vec::new();
         for (x, y) in piece {
+            // t????
             new_board.board[y as usize][x as usize] = Some('T');
 
             if cleared_lines.contains(&y) {
@@ -321,7 +332,7 @@ impl Board {
 
             let mut did_clear = true;
             for x in 0..10 {
-                if new_board.board[y as usize][x as usize] == None {
+                if new_board.board[y as usize][x as usize].is_none() {
                     did_clear = false;
                     break;
                 }
@@ -347,7 +358,7 @@ impl Board {
 
         // Update the queue
         if mv.location.piece != new_board.queue[0] {
-            if new_board.hold == None && new_board.queue.len() >= 2 {
+            if new_board.hold.is_none() && new_board.queue.len() >= 2 {
                 new_board.hold = Some(new_board.queue[0]);
                 new_board.queue.remove(0);
             } else {
@@ -359,7 +370,7 @@ impl Board {
         new_board
     }
 
-    pub fn make_move_in_place(&mut self, mv: Move) {
+    pub fn make_move_in_place(&mut self, mv: NaiveMove) {
         let board = self.make_move(mv);
         *self = board;
     }
@@ -496,7 +507,7 @@ mod tests {
     #[test]
     fn line_clear() {
         // What a lovely looking test!
-        let board = Board {
+        let board = NaiveBoard {
             back_to_back: false,
             board: [
                 [None; 10],

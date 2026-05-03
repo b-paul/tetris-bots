@@ -13,7 +13,7 @@ pub enum FrontendMessage {
     Suggest,
     Play {
         #[serde(rename = "move")]
-        mv: Move,
+        mv: TBPMove,
     },
     NewPiece {
         piece: Piece,
@@ -27,7 +27,7 @@ pub enum BotMessage {
     Error { reason: String },
     Ready,
     Info(BotInfo),
-    Suggestion { moves: Vec<Move> },
+    Suggestion { moves: Vec<TBPMove> },
 }
 
 #[derive(Deserialize)]
@@ -37,6 +37,21 @@ pub struct TBPBoard {
     pub combo: u32,
     pub back_to_back: bool,
     pub board: Vec<Vec<Option<char>>>,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct TBPMove {
+    pub location: TBPLocation,
+    pub spin: Spin,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct TBPLocation {
+    #[serde(rename = "type")]
+    pub piece: Piece,
+    pub orientation: Orientation,
+    pub x: i8,
+    pub y: i8,
 }
 
 #[derive(Serialize)]
